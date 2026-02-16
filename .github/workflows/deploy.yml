@@ -1,0 +1,141 @@
+# ============================================
+# Orbital TrIP — CI/CD Pipeline
+# GitHub Actions → Railway
+# ============================================
+name: Deploy Orbital TrIP
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ==========================================
+  # JOB 1: Test & Validate
+  # ==========================================
+  test:
+    name: Test & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify orbital data exists
+        run: |
+          if [ ! -f public/data/orbital_trip_data.json ]; then
+            echo "::error::Orbital data file missing!"
+            exit 1
+          fi
+          echo "✓ Orbital data present"
+          node -e "
+            const d = require('./public/data/orbital_trip_data.json');
+            const sats = Object.keys(d.satellites || d.sats || {});
+            console.log('✓ Satellites: ' + sats.length);
+            if (sats.length < 10) { console.error('Too few satellites'); process.exit(1); }
+          "
+
+      - name: Run health check
+        run: npm test
+
+      - name: Validate server starts
+        run: |
+          timeout 10 node src/server.js &
+          sleep 3
+          curl -sf http://localhost:3000/health | node -e "
+            let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+              const j=JSON.parse(d);
+              console.log('✓ Health:', j.status);
+              console.log('✓ Satellites:', j.data.satellites);
+              if(j.status!=='ok') process.exit(1);
+            })
+          "
+          curl -sf http://localhost:3000/api/trust-leaderboard | node -e "
+            let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+              const j=JSON.parse(d);
+              console.log('✓ Leaderboard:', j.count, 'satellites');
+              console.log('✓ Top:', j.leaderboard[0].name, j.leaderboard[0].trust_score);
+            })
+          "
+
+  # ==========================================
+  # JOB 2: Deploy to Railway
+  # ==========================================
+  deploy:
+    name: Deploy to Railway
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy
+        run: railway up --service orbital-trip --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting 30s for deployment to stabilize..."
+          sleep 30
+          # Health check against production
+          if [ -n "${{ vars.RAILWAY_URL }}" ]; then
+            curl -sf "${{ vars.RAILWAY_URL }}/health" | node -e "
+              let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+                const j=JSON.parse(d);
+                console.log('✓ Production health:', j.status);
+                console.log('✓ Satellites:', j.data.satellites);
+              })
+            " || echo "⚠ Health check failed (deployment may still be starting)"
+          else
+            echo "⚠ RAILWAY_URL not set — skipping production health check"
+          fi
+
+  # ==========================================
+  # JOB 3: Refresh Orbital Data (weekly)
+  # ==========================================
+  # Uncomment when CelesTrak API access is available
+  # refresh-data:
+  #   name: Refresh Orbital Data
+  #   runs-on: ubuntu-latest
+  #   # Run weekly on Monday at 06:00 UTC
+  #   schedule:
+  #     - cron: '0 6 * * 1'
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.12'
+  #
+  #     - name: Install pipeline deps
+  #       run: pip install sgp4 pynacl requests
+  #
+  #     - name: Run orbital data pipeline
+  #       run: python scripts/orbital_trip_pipeline.py
+  #
+  #     - name: Commit updated data
+  #       run: |
+  #         git config user.name "GNS Pipeline Bot"
+  #         git config user.email "pipeline@gns.foundation"
+  #         git add public/data/orbital_trip_data.json
+  #         git diff --cached --quiet || git commit -m "chore: refresh orbital data [$(date -u +%Y-%m-%d)]"
+  #         git push

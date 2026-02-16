@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbital TrIP — Space Object Identity Demo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=DM+Sans:wght@300;400;500;700&display=swap');
+
+:root {
+  --bg: #080c14;
+  --panel: #0d1420;
+  --panel-border: #1a2640;
+  --text: #c8d6e5;
+  --text-dim: #5a6f8a;
+  --accent: #00b4d8;
+  --accent-glow: rgba(0,180,216,0.15);
+  --green: #22c55e;
+  --yellow: #eab308;
+  --orange: #f97316;
+  --red: #ef4444;
+  --purple: #a855f7;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+  gap: 1px;
+  background: var(--panel-border);
+}
+
+/* HEADER */
+.header {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.header .logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+.header .subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+  border-left: 1px solid var(--panel-border);
+  padding-left: 16px;
+}
+.header .badge {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+.header .live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+  margin-right: 6px;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* LEFT PANEL - Satellite list */
+.sat-list {
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 12px 0;
+}
+.sat-list::-webkit-scrollbar { width: 4px; }
+.sat-list::-webkit-scrollbar-track { background: var(--panel); }
+.sat-list::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+.filter-bar {
+  padding: 0 12px 10px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all .2s;
+}
+.filter-btn.active, .filter-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.sat-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sat-item:hover { background: rgba(0,180,216,0.05); }
+.sat-item.active {
+  background: var(--accent-glow);
+  border-left-color: var(--accent);
+}
+.sat-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sat-info { flex: 1; min-width: 0; }
+.sat-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sat-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+}
+.trust-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.tier-odysseus { background: rgba(34,197,94,0.15); color: var(--green); }
+.tier-voyager { background: rgba(0,180,216,0.15); color: var(--accent); }
+.tier-pathfinder { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.tier-explorer { background: rgba(249,115,22,0.15); color: var(--orange); }
+.tier-seedling { background: rgba(239,68,68,0.15); color: var(--red); }
+
+/* MAP */
+.map-container {
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+canvas#map {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.map-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  background: rgba(8,12,20,0.85);
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--panel-border);
+}
+.map-legend span { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; }
+.map-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* RIGHT PANEL - Details */
+.detail-panel {
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 16px;
+}
+.detail-panel::-webkit-scrollbar { width: 4px; }
+.detail-panel::-webkit-scrollbar-track { background: var(--panel); }
+.detail-panel::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+.detail-section {
+  margin-bottom: 20px;
+}
+.detail-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.detail-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+.detail-big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.trust-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.trust-component {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.trust-comp-label { width: 100px; color: var(--text-dim); font-size: 10px; }
+.trust-comp-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.trust-comp-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.trust-comp-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  width: 28px;
+  text-align: right;
+}
+
+.chain-viz {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.chain-block {
+  width: 6px; height: 18px;
+  border-radius: 1px;
+  transition: all .3s;
+}
+
+.key-hex {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  word-break: break-all;
+  background: rgba(0,180,216,0.06);
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,180,216,0.15);
+}
+
+.luch-timeline {
+  margin-top: 8px;
+}
+.luch-event {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+  border-left: 2px solid var(--red);
+  padding-left: 10px;
+  margin-left: 4px;
+  margin-bottom: 4px;
+}
+.luch-year {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--yellow);
+  font-weight: 500;
+  flex-shrink: 0;
+  width: 32px;
+}
+.luch-target { color: var(--text-dim); }
+.luch-lon {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--red);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 20px;
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+.empty-state .msg { color: var(--text-dim); font-size: 13px; }
+
+.anomaly-alert {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+}
+.anomaly-alert .alert-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--red);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.anomaly-alert .alert-body {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.orbit-ring {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 12px;
+}
+.tab-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-btn:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <span class="live-dot"></span>
+    <span class="logo">ORBITAL TrIP</span>
+    <span class="subtitle">Space Object Identity via Proof-of-Trajectory</span>
+    <span class="badge">16 SATELLITES · SGP4 · Ed25519</span>
+  </div>
+
+  <div class="sat-list" id="satList">
+    <div class="filter-bar" id="filters"></div>
+  </div>
+
+  <div class="map-container">
+    <canvas id="map"></canvas>
+    <div class="map-legend">
+      <span><i class="dot" style="background:#22c55e"></i> Odysseus</span>
+      <span><i class="dot" style="background:#eab308"></i> Pathfinder</span>
+      <span><i class="dot" style="background:#f97316"></i> Explorer</span>
+      <span>Real SGP4 orbits from TLE data</span>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detailPanel">
+    <div class="empty-state">
+      <div class="icon">&#x1F6F0;</div>
+      <div class="msg">Select a satellite to view its<br>TrIP identity and trust score</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== EMBEDDED REAL ORBITAL DATA (SGP4 propagated, Ed25519 signed) =====
+const DATA={"sats":{"ISS (ZARYA)":{"n":25544,"c":"station","o":"NASA/Roscosmos","p":[[-47.5,-167.1,430],[-42.4,156.4,430],[-35.9,122.3,430],[-28.5,89.9,430],[-20.5,58.8,429],[-12.2,28.6,428],[-3.7,-1.2,427],[4.8,-30.9,426],[13.3,-60.7,424],[21.6,-91.0,422],[29.5,-122.2,420],[36.8,-154.8,418],[43.1,170.7,417],[48.1,133.8,415],[51.0,94.7,414],[51.5,54.3,413],[49.4,14.6,413],[45.1,-23.2,413],[39.2,-58.5,414],[32.1,-91.7,414],[24.4,-123.3,416],[16.2,-153.9,417],[7.8,176.1,418],[-0.8,146.4,420],[-9.3,116.7,421],[-17.7,86.6,423],[-25.8,55.9,424],[-33.4,24.0,425],[-40.2,-9.4,426],[-45.9,-45.1,427],[-49.9,-83.1,428],[-51.6,-123.0,429],[-50.7,-163.2,429],[-47.5,158.1,430],[-42.3,121.6,430],[-35.9,87.5,430],[-28.5,55.2,430],[-20.6,24.1,429],[-12.3,-6.1,428],[-3.8,-35.9,427],[4.7,-65.6,425],[13.2,-95.4,424],[21.5,-125.7,422],[29.4,-156.9,420],[36.7,170.6,418],[43.0,136.1,416],[48.0,99.3,415],[51.0,60.3,414],[51.5,19.9,413]],"t":{"total":91.0,"tier":"Odysseus","c":{"consistency":31.0,"compliance":21,"maturity":20,"corroboration":9,"integrity":10}},"k":"0aa42777cf9098af","ch":145},"STARLINK-1007":{"n":44713,"c":"leo_const","o":"SpaceX","p":[[-1.1,17.1,556],[15.4,-18.6,553],[31.2,-56.5,550],[44.5,-100.0,548],[52.3,-152.3,546],[51.1,150.8,547],[41.5,100.9,548],[27.3,59.2,550],[11.3,22.1,553],[-5.4,-13.4,556],[-21.7,-49.6,558],[-36.7,-89.2,559],[-48.4,-135.7,560],[-53.0,169.1,560],[-48.3,114.0,560],[-36.6,67.5,560],[-21.6,28.0,558],[-5.2,-8.2,556],[11.4,-43.7,554],[27.5,-80.8,551],[41.6,-122.5,548],[51.2,-172.6,547],[52.3,130.5,546],[44.4,78.3,548],[31.0,34.9,550],[15.3,-3.0,553],[-1.3,-38.7,555],[-17.8,-74.5,558],[-33.3,-112.9,559],[-46.0,-157.4,560],[-52.8,149.2,560],[-50.2,92.8,560],[-39.8,44.2,560],[-25.4,3.3,558],[-9.2,-33.4,557],[7.4,-68.9,554],[23.7,-105.4,551],[38.4,-145.6,549],[49.5,166.6,547],[52.9,110.5,546],[47.0,56.2,547],[34.6,10.9,549],[19.3,-27.9,552],[2.8,-63.9,555],[-13.8,-99.5,557],[-29.6,-137.0,559],[-43.3,-179.7,560],[-51.9,129.1,560],[-51.7,72.3,560]],"t":{"total":87.8,"tier":"Odysseus","c":{"consistency":31.8,"compliance":18,"maturity":20,"corroboration":8,"integrity":10}},"k":"604a934f870dfc09","ch":145},"STARLINK-1130":{"n":44914,"c":"leo_const","o":"SpaceX","p":[[-42.8,-20.0,560],[-29.0,-62.3,559],[-13.1,-99.7,557],[3.5,-135.3,555],[20.0,-171.3,552],[35.2,149.6,549],[47.4,103.9,547],[53.0,49.3,546],[49.1,-6.5,547],[37.8,-53.9,549],[23.0,-93.9,551],[6.7,-130.3,554],[-10.0,-165.8,557],[-26.1,157.3,558],[-40.4,116.2,559],[-50.5,67.2,560],[-52.6,10.7,560],[-45.5,-42.4,560],[-32.6,-86.5,559],[-17.1,-124.7,558],[-0.6,-160.5,555],[16.0,163.7,553],[31.7,125.7,550],[44.9,82.0,548],[52.5,29.4,546],[50.9,-27.4,547],[41.0,-77.1,548],[26.8,-118.5,551],[10.7,-155.5,554],[-5.9,169.0,556],[-22.2,132.7,558],[-37.2,93.0,559],[-48.6,46.2,560],[-53.0,-9.2,560],[-48.0,-64.1,560],[-36.1,-110.3,559],[-21.0,-149.6,558],[-4.7,174.2,556],[12.0,138.7,553],[28.0,101.5,551],[42.0,59.5,548],[51.3,9.2,547],[52.2,-47.7,546],[44.0,-99.7,548],[30.5,-142.8,550],[14.8,179.4,553],[-1.8,143.8,556],[-18.3,107.9,558],[-33.7,69.3,559]],"t":{"total":87.8,"tier":"Odysseus","c":{"consistency":31.8,"compliance":18,"maturity":20,"corroboration":8,"integrity":10}},"k":"931adb7247230570","ch":145},"STARLINK-2378":{"n":48062,"c":"leo_const","o":"SpaceX","p":[[-7.1,61.3,556],[9.6,25.8,554],[25.7,-11.0,551],[40.2,-52.0,548],[50.4,-101.0,547],[52.7,-157.6,546],[45.6,149.1,547],[32.7,104.9,550],[17.1,66.6,552],[0.6,30.8,555],[-16.0,-4.9,557],[-31.6,-42.9,559],[-44.8,-86.5,560],[-52.4,-139.0,560],[-51.0,164.3,560],[-41.3,114.6,560],[-27.1,73.1,559],[-11.1,36.1,557],[5.5,0.6,554],[21.9,-35.7,552],[36.9,-75.3,549],[48.5,-122.1,547],[53.0,-177.5,546],[48.0,127.4,547],[36.2,81.1,549],[21.0,41.7,552],[4.6,5.5,555],[-12.0,-30.0,557],[-28.0,-67.2,559],[-41.9,-109.1,560],[-51.3,-159.3,560],[-52.2,144.0,560],[-44.2,92.0,560],[-30.8,48.8,559],[-15.1,11.0,557],[1.5,-24.7,555],[18.0,-60.5,552],[33.5,-99.1,550],[46.2,-143.7,547],[52.8,162.6,546],[50.0,106.2,547],[39.5,57.7,548],[24.9,17.0,551],[8.7,-19.7,554],[-7.9,-55.2,556],[-24.2,-91.7,558],[-38.8,-132.1,560],[-49.6,180.0,560],[-52.9,123.9,560]],"t":{"total":87.8,"tier":"Odysseus","c":{"consistency":31.8,"compliance":18,"maturity":20,"corroboration":8,"integrity":10}},"k":"13c120de595efd06","ch":145},"INTELSAT 10-02":{"n":28358,"c":"geo_comms","o":"Intelsat/SES","p":[[0.0,-56.1,35806],[-0.0,-56.1,35807],[-0.0,-56.2,35807],[-0.0,-56.2,35804],[-0.0,-56.2,35800],[-0.0,-56.2,35794],[-0.0,-56.2,35789],[-0.0,-56.2,35784],[0.0,-56.2,35780],[-0.0,-56.1,35778],[-0.0,-56.1,35779],[-0.0,-56.1,35782],[-0.0,-56.1,35786],[-0.0,-56.1,35792],[-0.0,-56.1,35797],[-0.0,-56.1,35802],[-0.0,-56.1,35806],[0.0,-56.1,35807],[0.0,-56.1,35807],[0.0,-56.2,35804],[0.0,-56.2,35800],[0.0,-56.2,35794],[0.0,-56.2,35788],[0.0,-56.2,35784],[0.0,-56.2,35780],[-0.0,-56.1,35779],[-0.0,-56.1,35779],[-0.0,-56.1,35782],[-0.0,-56.1,35787],[-0.0,-56.1,35792],[-0.0,-56.1,35798],[-0.0,-56.1,35802],[-0.0,-56.1,35806],[0.0,-56.1,35807],[0.0,-56.1,35807],[0.0,-56.2,35804],[0.0,-56.2,35799],[0.0,-56.2,35794],[0.0,-56.2,35788],[0.0,-56.2,35784],[0.0,-56.2,35780],[0.0,-56.1,35779],[-0.0,-56.1,35780],[-0.0,-56.1,35782],[-0.0,-56.1,35787],[-0.0,-56.1,35792],[-0.0,-56.1,35798],[-0.0,-56.1,35803],[-0.0,-56.1,35806]],"t":{"total":88.6,"tier":"Odysseus","c":{"consistency":26.6,"compliance":24,"maturity":20,"corroboration":8,"integrity":10}},"k":"338114457519d2f3","ch":145},"SES-4":{"n":38087,"c":"geo_comms","o":"SES","p":[[-0.0,140.6,35798],[0.0,140.6,35801],[0.0,140.6,35802],[0.0,140.6,35802],[0.0,140.6,35801],[0.0,140.6,35798],[0.0,140.6,35795],[0.0,140.6,35791],[0.0,140.6,35788],[-0.0,140.6,35785],[-0.0,140.6,35784],[-0.0,140.6,35784],[-0.0,140.6,35786],[-0.0,140.6,35788],[-0.0,140.6,35792],[-0.0,140.6,35795],[-0.0,140.6,35798],[0.0,140.6,35801],[0.0,140.6,35802],[0.0,140.6,35802],[0.0,140.6,35801],[0.0,140.6,35798],[0.0,140.6,35795],[0.0,140.6,35791],[0.0,140.6,35788],[-0.0,140.6,35785],[-0.0,140.6,35784],[-0.0,140.6,35784],[-0.0,140.6,35786],[-0.0,140.6,35788],[-0.0,140.6,35792],[-0.0,140.6,35796],[-0.0,140.6,35799],[0.0,140.6,35801],[0.0,140.6,35802],[0.0,140.6,35802],[0.0,140.6,35801],[0.0,140.6,35798],[0.0,140.6,35795],[0.0,140.6,35791],[0.0,140.6,35788],[-0.0,140.6,35785],[-0.0,140.6,35784],[-0.0,140.6,35784],[-0.0,140.6,35786],[-0.0,140.6,35789],[-0.0,140.6,35792],[-0.0,140.6,35796],[-0.0,140.6,35799]],"t":{"total":91.6,"tier":"Odysseus","c":{"consistency":29.6,"compliance":24,"maturity":20,"corroboration":8,"integrity":10}},"k":"09514f07dcd1df03","ch":145},"EUTELSAT 9B":{"n":41028,"c":"geo_comms","o":"Eutelsat","p":[[-0.0,116.7,35804],[0.0,116.7,35802],[0.0,116.7,35799],[0.1,116.7,35795],[0.1,116.7,35790],[0.1,116.7,35786],[0.0,116.7,35783],[0.0,116.7,35781],[0.0,116.7,35781],[-0.0,116.7,35783],[-0.0,116.7,35786],[-0.1,116.8,35791],[-0.1,116.8,35795],[-0.1,116.7,35800],[-0.1,116.7,35803],[-0.0,116.7,35804],[-0.0,116.7,35804],[0.0,116.7,35802],[0.0,116.7,35799],[0.1,116.7,35795],[0.1,116.7,35790],[0.1,116.7,35786],[0.1,116.7,35783],[0.0,116.7,35781],[0.0,116.7,35782],[-0.0,116.7,35784],[-0.0,116.8,35787],[-0.1,116.8,35791],[-0.1,116.8,35796],[-0.1,116.8,35800],[-0.1,116.7,35803],[-0.0,116.7,35804],[-0.0,116.7,35804],[0.0,116.7,35802],[0.0,116.7,35799],[0.1,116.7,35795],[0.1,116.7,35790],[0.1,116.7,35786],[0.1,116.7,35783],[0.0,116.7,35782],[0.0,116.7,35782],[-0.0,116.7,35784],[-0.0,116.8,35787],[-0.1,116.8,35792],[-0.1,116.8,35796],[-0.1,116.7,35800],[-0.1,116.7,35803],[-0.0,116.7,35805],[-0.0,116.7,35804]],"t":{"total":90.2,"tier":"Odysseus","c":{"consistency":28.2,"compliance":24,"maturity":20,"corroboration":8,"integrity":10}},"k":"5eb4d20f0946a5e6","ch":145},"ONEWEB-0012":{"n":44057,"c":"leo_const","o":"OneWeb/Eutelsat","p":[[-18.2,29.4,1214],[46.0,3.9,1203],[69.6,169.2,1201],[5.4,141.2,1211],[-58.6,114.9,1217],[-57.3,-80.9,1217],[6.8,-107.0,1210],[70.9,-135.4,1200],[44.6,30.2,1204],[-19.5,4.8,1215],[-83.2,-35.1,1218],[-32.4,141.7,1215],[31.7,116.5,1206],[83.6,-65.6,1200],[19.7,-106.6,1209],[-44.4,-132.0,1217],[-71.4,33.8,1217],[-7.5,5.2,1212],[56.7,-20.9,1202],[58.9,143.3,1202],[-5.3,117.0,1213],[-69.2,89.1,1218],[-46.6,-105.7,1216],[17.5,-131.2,1208],[81.5,-167.3,1200],[33.9,5.7,1206],[-30.2,-19.5,1216],[-85.3,165.6,1218],[-21.7,117.4,1214],[42.4,92.1,1204],[73.1,-101.6,1200],[9.0,-130.8,1210],[-55.1,-156.7,1217],[-60.8,7.5,1217],[3.2,-19.0,1211],[67.4,-46.5,1201],[48.2,118.4,1203],[-16.0,92.8,1214],[-79.8,59.1,1218],[-35.9,-130.2,1216],[28.2,-155.4,1206],[86.7,43.4,1200],[23.2,-18.5,1208],[-40.9,-43.8,1216],[-74.9,123.3,1218],[-11.0,93.3,1213],[53.1,67.5,1202],[62.4,-128.3,1201],[-1.7,-154.9,1212]],"t":{"total":87.2,"tier":"Odysseus","c":{"consistency":31.2,"compliance":18,"maturity":20,"corroboration":8,"integrity":10}},"k":"7ef9d1a8b4c74384","ch":145},"SENTINEL-2A":{"n":40697,"c":"earth_obs","o":"ESA","p":[[75.2,41.3,788],[39.0,46.5,793],[1.3,30.8,799],[-36.5,14.9,803],[-72.9,15.3,804],[-65.3,124.4,804],[-28.2,116.4,802],[9.6,100.0,798],[47.3,85.4,791],[80.7,120.3,788],[54.4,-161.1,790],[16.8,-174.1,796],[-21.0,169.3,802],[-58.3,157.7,804],[-78.6,-107.2,804],[-43.6,-89.7,803],[-6.0,-104.9,800],[31.8,-121.1,794],[68.8,-126.1,789],[69.3,-15.0,789],[32.4,-19.5,794],[-5.4,-35.7,800],[-43.1,-50.9,803],[-78.2,-35.3,804],[-58.9,61.6,804],[-21.5,50.1,802],[16.3,33.5,796],[53.9,20.4,790],[80.9,95.9,788],[47.9,133.9,791],[10.2,119.5,798],[-27.6,103.0,802],[-64.7,94.6,804],[-73.4,-156.8,804],[-37.0,-155.5,803],[0.7,-171.4,799],[38.5,172.9,793],[74.7,177.0,788],[63.1,-76.2,789],[25.8,-85.6,795],[-12.1,-102.1,801],[-49.6,-116.3,804],[-81.3,-68.5,804],[-52.4,-2.8,804],[-14.9,-16.3,801],[22.9,-32.8,795],[60.4,-43.6,790],[77.0,57.8,788],[41.3,68.4,792]],"t":{"total":89.3,"tier":"Odysseus","c":{"consistency":31.3,"compliance":20,"maturity":20,"corroboration":8,"integrity":10}},"k":"e6899faf70e5c448","ch":145},"LANDSAT 9":{"n":49260,"c":"earth_obs","o":"NASA/USGS","p":[[-71.5,-116.0,718],[-40.6,-120.0,717],[-8.7,-136.7,714],[23.3,-154.3,709],[55.1,-168.5,704],[81.6,-124.2,701],[58.2,-58.9,703],[26.5,-72.0,708],[-5.5,-89.6,714],[-37.4,-106.6,717],[-68.6,-113.8,718],[-75.2,-10.9,718],[-44.7,-8.6,717],[-12.9,-24.8,714],[19.1,-42.5,709],[51.0,-57.6,704],[79.9,-36.0,701],[62.3,51.2,703],[30.7,39.7,708],[-1.3,22.3,713],[-33.3,5.0,716],[-64.7,-5.1,718],[-78.4,89.9,718],[-48.8,102.6,717],[-17.0,87.1,715],[15.0,69.3,710],[46.9,53.5,705],[77.0,61.0,702],[66.2,160.4,702],[34.8,151.3,707],[2.8,134.2,712],[-29.1,116.7,716],[-60.7,104.5,718],[-80.8,-176.6,718],[-52.9,-146.4,717],[-21.2,-161.1,715],[10.8,-178.8,711],[42.8,164.8,705],[73.6,164.0,702],[70.1,-91.4,702],[38.9,-97.1,706],[7.0,-113.9,712],[-25.0,-131.5,716],[-56.7,-145.2,718],[-81.8,-91.4,718],[-57.0,-35.7,718],[-25.3,-49.3,716],[6.7,-66.9,712],[38.7,-83.8,706]],"t":{"total":89.2,"tier":"Odysseus","c":{"consistency":31.2,"compliance":20,"maturity":20,"corroboration":8,"integrity":10}},"k":"b662beb9f9f7da0d","ch":145},"GPS BIIR-2 (PRN 13)":{"n":24876,"c":"navigation","o":"US Space Force","p":[[-5.0,49.8,20231],[31.4,55.4,20120],[55.2,88.7,20049],[39.0,131.7,20062],[3.6,140.5,20151],[-32.6,146.4,20262],[-55.3,179.9,20330],[-39.1,-138.6,20316],[-4.1,-130.2,20229],[32.1,-124.4,20118],[55.3,-90.1,20049],[38.3,-47.8,20064],[2.7,-39.4,20154],[-33.3,-33.3,20264],[-55.4,1.1,20330],[-38.4,41.8,20315],[-3.3,49.9,20226],[32.9,56.0,20115],[55.4,91.2,20048],[37.6,132.6,20065],[1.9,140.6,20156],[-34.1,147.0,20266],[-55.5,-177.6,20331],[-37.7,-137.8,20314],[-2.5,-130.0,20224],[33.6,-123.7,20113],[55.5,-87.5,20047],[36.8,-47.0,20066],[1.0,-39.3,20158],[-34.8,-32.7,20268],[-55.5,3.7,20331],[-37.0,42.6,20312],[-1.6,50.0,20221],[34.4,56.6,20111],[55.5,93.8,20047],[36.1,133.4,20068],[0.2,140.8,20161],[-35.5,147.7,20270],[-55.5,-175.1,20332],[-36.2,-137.0,20311],[-0.8,-129.9,20219],[35.1,-123.0,20109],[55.5,-84.8,20046],[35.4,-46.2,20069],[-0.7,-39.2,20164],[-36.3,-32.0,20272],[-55.5,6.2,20332],[-35.5,43.4,20309],[0.1,50.2,20216]],"t":{"total":92.7,"tier":"Odysseus","c":{"consistency":30.7,"compliance":23,"maturity":20,"corroboration":9,"integrity":10}},"k":"3290d7ce3ecfe5e2","ch":145},"GOES 16":{"n":41866,"c":"geo_weather","o":"NOAA","p":[[0.0,-51.5,35796],[0.0,-51.5,35796],[-0.0,-51.5,35796],[-0.0,-51.5,35796],[-0.0,-51.5,35795],[-0.0,-51.5,35794],[-0.0,-51.5,35792],[-0.0,-51.5,35791],[-0.0,-51.5,35790],[-0.0,-51.5,35790],[0.0,-51.5,35790],[0.0,-51.5,35790],[0.0,-51.5,35791],[0.0,-51.5,35792],[0.0,-51.5,35794],[0.0,-51.5,35795],[0.0,-51.5,35796],[0.0,-51.5,35796],[-0.0,-51.5,35796],[-0.0,-51.5,35796],[-0.0,-51.5,35795],[-0.0,-51.5,35794],[-0.0,-51.5,35792],[-0.0,-51.5,35791],[-0.0,-51.5,35790],[-0.0,-51.5,35790],[0.0,-51.5,35790],[0.0,-51.5,35790],[0.0,-51.5,35791],[0.0,-51.5,35792],[0.0,-51.5,35794],[0.0,-51.5,35795],[0.0,-51.5,35796],[0.0,-51.5,35796],[-0.0,-51.5,35796],[-0.0,-51.5,35796],[-0.0,-51.5,35795],[-0.0,-51.5,35794],[-0.0,-51.5,35792],[-0.0,-51.5,35791],[-0.0,-51.5,35790],[-0.0,-51.5,35790],[0.0,-51.5,35790],[0.0,-51.5,35790],[0.0,-51.5,35791],[0.0,-51.5,35793],[0.0,-51.5,35794],[0.0,-51.5,35795],[0.0,-51.5,35796]],"t":{"total":95.0,"tier":"Odysseus","c":{"consistency":33.0,"compliance":24,"maturity":20,"corroboration":8,"integrity":10}},"k":"94d023613f77f7c9","ch":145},"LUCH (OLYMP-K1)":{"n":40258,"c":"suspicious","o":"Russian MOD","p":[[-0.2,117.7,35794],[1.3,117.7,35800],[2.6,117.6,35805],[3.5,117.6,35809],[3.9,117.6,35809],[3.7,117.7,35808],[2.9,117.7,35804],[1.7,117.7,35799],[0.2,117.6,35792],[-1.3,117.6,35786],[-2.6,117.6,35782],[-3.5,117.6,35779],[-3.9,117.6,35778],[-3.6,117.7,35780],[-2.9,117.7,35783],[-1.6,117.7,35789],[-0.1,117.7,35795],[1.4,117.6,35801],[2.6,117.6,35806],[3.5,117.6,35809],[3.9,117.6,35810],[3.6,117.7,35808],[2.8,117.7,35804],[1.6,117.7,35799],[0.1,117.6,35792],[-1.4,117.6,35786],[-2.7,117.5,35782],[-3.5,117.6,35779],[-3.9,117.6,35778],[-3.6,117.7,35780],[-2.8,117.7,35784],[-1.6,117.7,35789],[-0.1,117.7,35795],[1.4,117.6,35801],[2.7,117.6,35806],[3.6,117.6,35809],[3.9,117.6,35810],[3.6,117.7,35808],[2.8,117.7,35804],[1.5,117.6,35798],[0.1,117.6,35792],[-1.4,117.5,35786],[-2.7,117.5,35782],[-3.6,117.6,35779],[-3.9,117.6,35778],[-3.6,117.7,35780],[-2.8,117.7,35784],[-1.5,117.7,35790],[-0.0,117.7,35796]],"t":{"total":52.8,"tier":"Pathfinder","c":{"consistency":11.8,"compliance":4,"maturity":20,"corroboration":7,"integrity":10}},"k":"ec5974ca438ce99c","ch":145},"CSS (TIANHE)":{"n":48274,"c":"station","o":"CNSA","p":[[28.0,-126.5,383],[23.5,-156.9,384],[18.7,173.1,384],[13.6,143.6,384],[8.4,114.4,384],[3.0,85.3,385],[-2.3,56.3,385],[-7.7,27.2,386],[-12.9,-2.0,386],[-18.0,-31.5,387],[-22.8,-61.4,387],[-27.4,-91.7,388],[-31.5,-122.7,388],[-35.0,-154.3,389],[-37.9,173.4,389],[-40.0,140.4,390],[-41.2,106.9,390],[-41.4,73.2,391],[-40.6,39.6,391],[-38.9,6.4,392],[-36.3,-26.2,392],[-32.9,-58.1,393],[-29.0,-89.3,393],[-24.7,-119.8,393],[-19.9,-149.8,393],[-15.0,-179.4,393],[-9.8,151.3,393],[-4.5,122.2,393],[0.8,93.2,392],[6.2,64.2,392],[11.4,35.0,391],[16.5,5.7,390],[21.5,-24.1,389],[26.1,-54.2,388],[30.3,-85.0,387],[34.1,-116.4,386],[37.2,-148.5,385],[39.5,178.7,384],[41.0,145.3,383],[41.5,111.6,383],[40.9,78.0,382],[39.5,44.6,382],[37.1,11.8,382],[34.0,-20.3,382],[30.2,-51.7,382],[26.0,-82.4,382],[21.3,-112.6,382],[16.4,-142.3,383],[11.3,-171.7,383]],"t":{"total":92.4,"tier":"Odysseus","c":{"consistency":32.4,"compliance":21,"maturity":20,"corroboration":9,"integrity":10}},"k":"26f08f5c7ed614ed","ch":145},"COSMOS 1408 DEB":{"n":50100,"c":"debris","o":"N/A (ASAT debris)","p":[[-29.8,-91.7,652],[-55.3,-120.9,633],[-79.2,-175.9,612],[-70.2,46.0,594],[-44.8,9.5,583],[-18.7,-18.0,579],[7.5,-44.1,584],[33.6,-70.7,595],[59.3,-101.1,612],[81.7,-174.3,631],[66.6,64.0,650],[41.5,30.4,663],[16.0,3.3,669],[-9.5,-22.7,664],[-35.1,-49.4,651],[-60.6,-80.1,631],[-82.2,-160.9,610],[-65.2,84.4,593],[-39.5,51.6,582],[-13.3,24.6,579],[12.9,-1.5,584],[38.9,-28.5,596],[64.5,-61.0,613],[82.4,-170.2,633],[61.5,103.6,651],[36.2,72.6,664],[10.7,45.9,669],[-14.9,19.8,663],[-40.4,-7.2,649],[-65.7,-40.2,629],[-82.0,-157.5,608],[-60.0,124.4,591],[-34.1,93.8,581],[-8.0,67.2,579],[18.2,41.0,584],[44.3,13.6,597],[69.6,-22.3,615],[79.8,-157.9,635],[56.3,144.3,653],[30.9,114.9,666],[5.4,88.5,669],[-20.2,62.4,663],[-45.7,34.8,647],[-70.7,-2.0,627],[-78.9,-141.1,606],[-54.7,165.3,590],[-28.8,136.2,580],[-2.6,109.8,579],[23.6,83.5,585]],"t":{"total":34.8,"tier":"Explorer","c":{"consistency":1.8,"compliance":0,"maturity":20,"corroboration":3,"integrity":10}},"k":"261524a814ad7e4c","ch":145},"HST":{"n":20580,"c":"science","o":"NASA","p":[[26.5,-172.8,536],[21.3,143.5,537],[13.8,101.5,539],[4.9,60.7,541],[-4.4,20.5,543],[-13.3,-20.2,544],[-20.9,-62.1,546],[-26.2,-105.7,546],[-28.4,-150.6,547],[-27.1,164.3,547],[-22.4,120.4,546],[-15.3,78.1,545],[-6.6,37.2,544],[2.6,-3.1,542],[11.7,-43.6,540],[19.6,-85.3,538],[25.5,-128.6,537],[28.3,-173.4,536],[27.6,141.4,536],[23.4,97.1,537],[16.7,54.5,539],[8.2,13.4,540],[-1.1,-27.0,542],[-10.2,-67.4,544],[-18.4,-108.8,545],[-24.6,-151.7,546],[-28.0,163.8,547],[-28.0,118.6,547],[-24.4,74.1,546],[-18.1,31.2,545],[-9.8,-10.1,544],[-0.7,-50.5,542],[8.6,-90.9,540],[17.0,-132.0,538],[23.7,-174.7,537],[27.7,140.9,536],[28.2,95.7,536],[25.3,51.0,537],[19.3,7.7,538],[11.3,-33.9,540],[2.3,-74.4,542],[-7.0,-114.7,544],[-15.6,-155.6,545],[-22.7,162.0,546],[-27.2,118.0,547],[-28.4,72.9,547],[-26.1,28.1,546],[-20.6,-15.4,545],[-12.9,-57.3,544]],"t":{"total":90.5,"tier":"Odysseus","c":{"consistency":32.5,"compliance":20,"maturity":20,"corroboration":8,"integrity":10}},"k":"9158417af57bc64e","ch":145}},"luch_history":[{"yr":2015,"lon":18.1,"target":"Intelsat 7/8 (Atlantic)"},{"yr":2015,"lon":24.5,"target":"French mil SICRAL"},{"yr":2016,"lon":55.0,"target":"Intelsat 17 (Indian Ocean)"},{"yr":2017,"lon":36.0,"target":"Spainsat/Xtar-Eur"},{"yr":2017,"lon":47.5,"target":"Athena-Fidus (FR-IT mil)"},{"yr":2018,"lon":101.0,"target":"Intelsat 10-02"},{"yr":2019,"lon":17.8,"target":"Return to prev position"},{"yr":2020,"lon":60.0,"target":"Intelsat 22"},{"yr":2021,"lon":36.0,"target":"Return Spainsat region"},{"yr":2022,"lon":75.0,"target":"ABS-2 / Yamal 402"},{"yr":2023,"lon":95.0,"target":"NSS-6 region"},{"yr":2024,"lon":47.5,"target":"Return Athena-Fidus"}]};
+
+const CAT_COLORS = {
+  station: '#22c55e', leo_const: '#00b4d8', geo_comms: '#a855f7',
+  geo_weather: '#c084fc', earth_obs: '#06b6d4', navigation: '#3b82f6',
+  science: '#14b8a6', suspicious: '#ef4444', debris: '#f97316',
+};
+const CAT_LABELS = {
+  station: 'Station', leo_const: 'LEO Constellation', geo_comms: 'GEO Comms',
+  geo_weather: 'GEO Weather', earth_obs: 'Earth Obs', navigation: 'Navigation',
+  science: 'Science', suspicious: 'Suspicious', debris: 'Debris',
+};
+const TIER_CLASSES = {
+  Odysseus: 'tier-odysseus', Voyager: 'tier-voyager', Pathfinder: 'tier-pathfinder',
+  Explorer: 'tier-explorer', Seedling: 'tier-seedling',
+};
+
+let selected = null;
+let activeFilter = 'all';
+let animFrame = 0;
+
+// ===== SATELLITE LIST =====
+const categories = ['all', ...new Set(Object.values(DATA.sats).map(s => s.c))];
+const filterBar = document.getElementById('filters');
+categories.forEach(cat => {
+  const btn = document.createElement('button');
+  btn.className = 'filter-btn' + (cat === 'all' ? ' active' : '');
+  btn.textContent = cat === 'all' ? 'ALL' : CAT_LABELS[cat] || cat;
+  btn.onclick = () => {
+    activeFilter = cat;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderSatList();
+  };
+  filterBar.appendChild(btn);
+});
+
+function renderSatList() {
+  const list = document.getElementById('satList');
+  list.querySelectorAll('.sat-item').forEach(el => el.remove());
+  const sorted = Object.entries(DATA.sats).sort((a,b) => b[1].t.total - a[1].t.total);
+  sorted.forEach(([name, sat]) => {
+    if (activeFilter !== 'all' && sat.c !== activeFilter) return;
+    const el = document.createElement('div');
+    el.className = 'sat-item' + (selected === name ? ' active' : '');
+    const color = CAT_COLORS[sat.c] || '#888';
+    el.innerHTML = `
+      <div class="sat-dot" style="background:${color}"></div>
+      <div class="sat-info">
+        <div class="sat-name">${name}</div>
+        <div class="sat-meta"><span>${sat.o}</span><span>${sat.p[0][2].toLocaleString()} km</span></div>
+      </div>
+      <div class="trust-badge ${TIER_CLASSES[sat.t.tier]}">${sat.t.total}</div>
+    `;
+    el.onclick = () => { selected = name; renderSatList(); renderDetail(); drawMap(); };
+    list.appendChild(el);
+  });
+}
+
+// ===== DETAIL PANEL =====
+function renderDetail() {
+  const panel = document.getElementById('detailPanel');
+  if (!selected) {
+    panel.innerHTML = '<div class="empty-state"><div class="icon">&#x1F6F0;</div><div class="msg">Select a satellite to view its<br>TrIP identity and trust score</div></div>';
+    return;
+  }
+  const sat = DATA.sats[selected];
+  const t = sat.t;
+  const color = CAT_COLORS[sat.c];
+  const isLuch = sat.c === 'suspicious';
+  const isDebris = sat.c === 'debris';
+
+  const compNames = {consistency:'Consistency',compliance:'Compliance',maturity:'Maturity',corroboration:'Corroboration',integrity:'Integrity'};
+  const compMax = {consistency:35,compliance:25,maturity:20,corroboration:10,integrity:10};
+
+  let html = `
+    <div class="detail-section">
+      <div class="detail-label">SATELLITE IDENTITY</div>
+      <div class="detail-value" style="color:${color}">${selected}</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:4px">NORAD ${sat.n} · ${CAT_LABELS[sat.c]} · ${sat.o}</div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-label">ORBITAL TrIP TRUST SCORE</div>
+      <div class="detail-big" style="color:${color}">${t.total}<span style="font-size:16px;color:var(--text-dim)">/100</span></div>
+      <div class="trust-badge ${TIER_CLASSES[t.tier]}" style="margin-top:6px;display:inline-block">${t.tier}</div>
+      <div class="trust-bar-container">`;
+
+  Object.entries(t.c).forEach(([k,v]) => {
+    const max = compMax[k];
+    const pct = (v/max*100).toFixed(0);
+    html += `
+      <div class="trust-component">
+        <div class="trust-comp-label">${compNames[k]}</div>
+        <div class="trust-comp-bar"><div class="trust-comp-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="trust-comp-val">${v}/${max}</div>
+      </div>`;
+  });
+  html += '</div></div>';
+
+  // Chain visualization
+  html += `
+    <div class="detail-section">
+      <div class="detail-label">BREADCRUMB CHAIN (${sat.ch} BLOCKS)</div>
+      <div class="chain-viz">`;
+  for (let i = 0; i < Math.min(sat.ch, 48); i++) {
+    const opacity = 0.3 + (i/48)*0.7;
+    html += `<div class="chain-block" style="background:${color};opacity:${opacity}"></div>`;
+  }
+  html += `</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:6px">72h window · 30-min intervals · Ed25519 signed · SHA-256 chained</div>
+    </div>`;
+
+  // Ed25519 Public Key
+  html += `
+    <div class="detail-section">
+      <div class="detail-label">ED25519 PUBLIC KEY</div>
+      <div class="key-hex">${sat.k}...</div>
+    </div>`;
+
+  // Orbital data
+  const alt = sat.p[Math.floor(sat.p.length/2)][2];
+  const isGeo = alt > 30000;
+  html += `
+    <div class="detail-section">
+      <div class="detail-label">ORBITAL PARAMETERS</div>
+      <div style="font-size:12px;line-height:1.8">
+        Altitude: <strong>${alt.toLocaleString()} km</strong> (${isGeo ? 'GEO' : alt > 15000 ? 'MEO' : 'LEO'})<br>
+        Ground track points: <strong>${sat.p.length}</strong><br>
+        Regime: <strong>${isGeo ? 'Geostationary' : alt > 15000 ? 'Medium Earth Orbit' : 'Low Earth Orbit'}</strong>
+      </div>
+    </div>`;
+
+  // Anomaly alert for Luch
+  if (isLuch) {
+    html += `
+      <div class="anomaly-alert">
+        <div class="alert-title">&#x26A0; TRAJECTORY ANOMALY DETECTED</div>
+        <div class="alert-body">
+          This satellite has visited 12+ GEO positions since 2014, approaching within 5 km of Western military and commercial satellites. Each repositioning constitutes a trust score reset event. Orbital TrIP flags this behavior as anomalous — no legitimate comms satellite moves this frequently.
+        </div>
+      </div>
+      <div class="detail-section" style="margin-top:12px">
+        <div class="detail-label">DOCUMENTED APPROACHES (2015–2024)</div>
+        <div class="luch-timeline">`;
+    DATA.luch_history.forEach(ev => {
+      html += `<div class="luch-event">
+        <span class="luch-year">${ev.yr}</span>
+        <span class="luch-target">${ev.target}</span>
+        <span class="luch-lon">${ev.lon}°E</span>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  // Debris alert
+  if (isDebris) {
+    html += `
+      <div class="anomaly-alert">
+        <div class="alert-title">&#x26A0; UNCONTROLLED DEBRIS</div>
+        <div class="alert-body">
+          Fragment from Russia's November 2021 ASAT test on Cosmos 1408. No operator, no station-keeping, no identity — only a NORAD catalog number. Orbital TrIP assigns ground-attested breadcrumbs from radar tracking. Trust score reflects: zero compliance (no operator), minimal corroboration (radar only), high altitude variation from orbital decay.
+        </div>
+      </div>`;
+  }
+
+  panel.innerHTML = html;
+}
+
+// ===== MAP RENDERING =====
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = rect.width * 2; H = rect.height * 2;
+  canvas.width = W; canvas.height = H;
+  drawMap();
+}
+window.addEventListener('resize', resize);
+
+function lonToX(lon) { return (lon + 180) / 360 * W; }
+function latToY(lat) { return (90 - lat) / 180 * H; }
+
+function drawMap() {
+  ctx.fillStyle = '#080c14';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(26,38,64,0.5)';
+  ctx.lineWidth = 1;
+  for (let lon = -180; lon <= 180; lon += 30) {
+    ctx.beginPath(); ctx.moveTo(lonToX(lon), 0); ctx.lineTo(lonToX(lon), H); ctx.stroke();
+  }
+  for (let lat = -90; lat <= 90; lat += 30) {
+    ctx.beginPath(); ctx.moveTo(0, latToY(lat)); ctx.lineTo(W, latToY(lat)); ctx.stroke();
+  }
+
+  // Equator
+  ctx.strokeStyle = 'rgba(0,180,216,0.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, latToY(0)); ctx.lineTo(W, latToY(0)); ctx.stroke();
+
+  // Grid labels
+  ctx.fillStyle = 'rgba(90,111,138,0.4)';
+  ctx.font = `${Math.max(16, W*0.012)}px JetBrains Mono`;
+  for (let lon = -150; lon <= 150; lon += 60) {
+    ctx.fillText(`${lon}°`, lonToX(lon)+4, latToY(0)-6);
+  }
+
+  // GEO belt indicator
+  ctx.strokeStyle = 'rgba(168,85,247,0.12)';
+  ctx.lineWidth = W * 0.003;
+  ctx.setLineDash([8,8]);
+  ctx.beginPath(); ctx.moveTo(0, latToY(5)); ctx.lineTo(W, latToY(5)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, latToY(-5)); ctx.lineTo(W, latToY(-5)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(168,85,247,0.2)';
+  ctx.font = `${Math.max(14, W*0.01)}px JetBrains Mono`;
+  ctx.fillText('GEO BELT', lonToX(-170), latToY(6));
+
+  // Draw all satellite tracks
+  const sorted = Object.entries(DATA.sats);
+  sorted.forEach(([name, sat]) => {
+    if (activeFilter !== 'all' && sat.c !== activeFilter) return;
+    const color = CAT_COLORS[sat.c] || '#888';
+    const isActive = name === selected;
+    const pts = sat.p;
+
+    // Track line
+    ctx.strokeStyle = isActive ? color : color + '40';
+    ctx.lineWidth = isActive ? 3 : 1.5;
+    ctx.beginPath();
+    let prevX = null;
+    pts.forEach((p, i) => {
+      const x = lonToX(p[1]), y = latToY(p[0]);
+      if (i === 0 || (prevX !== null && Math.abs(x - prevX) > W * 0.4)) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      prevX = x;
+    });
+    ctx.stroke();
+
+    // Current position (last point)
+    const last = pts[pts.length - 1];
+    const lx = lonToX(last[1]), ly = latToY(last[0]);
+    const r = isActive ? 8 : 4;
+
+    if (isActive) {
+      // Glow
+      ctx.fillStyle = color + '30';
+      ctx.beginPath(); ctx.arc(lx, ly, r*3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2); ctx.fill();
+
+    // Label for active
+    if (isActive) {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.max(16, W*0.012)}px JetBrains Mono`;
+      ctx.fillText(name, lx + r + 8, ly + 5);
+    }
+  });
+
+  // Luch history markers if Luch is selected
+  if (selected === 'LUCH (OLYMP-K1)') {
+    DATA.luch_history.forEach(ev => {
+      const x = lonToX(ev.lon), y = latToY(0);
+      ctx.fillStyle = 'rgba(239,68,68,0.3)';
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(239,68,68,0.7)';
+      ctx.font = `${Math.max(12, W*0.008)}px JetBrains Mono`;
+      ctx.fillText(ev.yr.toString(), x-10, y-14);
+    });
+  }
+
+  animFrame++;
+}
+
+// ===== INIT =====
+renderSatList();
+renderDetail();
+setTimeout(resize, 50);
+
+// Auto-select Luch to show the demo's killer feature
+setTimeout(() => {
+  selected = 'LUCH (OLYMP-K1)';
+  renderSatList();
+  renderDetail();
+  drawMap();
+}, 300);
+</script>
+</body>
+</html>

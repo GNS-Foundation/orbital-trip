@@ -1,0 +1,27 @@
+{
+  "name": "orbital-trip",
+  "version": "0.1.0",
+  "description": "Orbital TrIP — Space Object Identity via Proof-of-Trajectory",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node scripts/healthcheck.js",
+    "pipeline": "python3 scripts/orbital_trip_pipeline.py"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "compression": "^1.7.4",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5"
+  },
+  "author": "Camilo Ayerbe Posada <camilo@ulissy.com>",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GNS-Foundation/orbital-trip"
+  }
+}
