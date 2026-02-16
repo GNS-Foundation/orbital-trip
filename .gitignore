@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 dist/
 .railway/
+# Generated at runtime by pipeline
+public/data/orbital_trip_data.json

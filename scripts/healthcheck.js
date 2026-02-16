@@ -1,77 +1,27 @@
 #!/usr/bin/env node
-/**
- * Orbital TrIP — Health Check
- * Validates server can start and data is present
- */
-const fs = require('fs');
-const path = require('path');
+const path = require("path");
+const fs = require("fs");
 
-let failures = 0;
-
+const checks = [];
 function check(name, fn) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (e) {
-    console.error(`  ✗ ${name}: ${e.message}`);
-    failures++;
-  }
+  try { fn(); checks.push({ name, ok: true }); console.log(`  \u2713 ${name}`); }
+  catch (e) { checks.push({ name, ok: false }); console.log(`  \u2717 ${name}: ${e.message}`); }
 }
 
-console.log('\nOrbital TrIP — Health Check\n');
+console.log("\n  Orbital TrIP v1.0 — Healthcheck\n");
 
-check('Server entry point exists', () => {
-  if (!fs.existsSync(path.join(__dirname, '..', 'src', 'server.js')))
-    throw new Error('src/server.js not found');
+check("Server entry", () => { if (!fs.existsSync(path.join(__dirname, "..", "src", "server.js"))) throw new Error("missing"); });
+check("Pipeline module", () => { if (!fs.existsSync(path.join(__dirname, "..", "src", "pipeline.js"))) throw new Error("missing"); });
+check("Catalog module", () => {
+  const { CATALOG, STORIES } = require(path.join(__dirname, "..", "src", "catalog.js"));
+  if (CATALOG.length < 50) throw new Error(`Only ${CATALOG.length} satellites`);
+  if (Object.keys(STORIES).length < 3) throw new Error(`Only ${Object.keys(STORIES).length} stories`);
 });
-
-check('Public directory exists', () => {
-  if (!fs.existsSync(path.join(__dirname, '..', 'public', 'index.html')))
-    throw new Error('public/index.html not found');
+check("Public directory", () => {
+  if (!fs.existsSync(path.join(__dirname, "..", "public", "index.html"))) throw new Error("no index.html");
 });
+check("Dependencies", () => { require("express"); require("satellite.js"); require("tweetnacl"); require("node-cron"); });
 
-check('Orbital data present', () => {
-  const p = path.join(__dirname, '..', 'public', 'data', 'orbital_trip_data.json');
-  if (!fs.existsSync(p)) throw new Error('Data file not found');
-  const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-  const sats = data.satellites || data.sats || {};
-  const count = Object.keys(sats).length;
-  if (count < 10) throw new Error(`Only ${count} satellites (need 10+)`);
-  console.log(`    └ ${count} satellites loaded`);
-});
-
-check('Trust scores valid', () => {
-  const p = path.join(__dirname, '..', 'public', 'data', 'orbital_trip_data.json');
-  const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-  const sats = data.satellites || data.sats || {};
-  for (const [name, sat] of Object.entries(sats)) {
-    const trust = (sat.trust || sat.t);
-    if (!trust || typeof trust.total !== 'number')
-      throw new Error(`${name}: missing trust score`);
-    if (trust.total < 0 || trust.total > 100)
-      throw new Error(`${name}: trust ${trust.total} out of range`);
-  }
-});
-
-check('Ed25519 keys present', () => {
-  const p = path.join(__dirname, '..', 'public', 'data', 'orbital_trip_data.json');
-  const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-  const sats = data.satellites || data.sats || {};
-  for (const [name, sat] of Object.entries(sats)) {
-    const trip = sat.trip || sat.t;
-    const pk = trip.pk || trip.public_key || sat.k;
-    if (!pk || pk.length < 16)
-      throw new Error(`${name}: missing or invalid public key`);
-  }
-});
-
-check('Dependencies installed', () => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-  for (const dep of Object.keys(pkg.dependencies || {})) {
-    try { require.resolve(dep); }
-    catch { throw new Error(`${dep} not installed`); }
-  }
-});
-
-console.log(`\n${failures === 0 ? '✓ All checks passed' : `✗ ${failures} check(s) failed`}\n`);
-process.exit(failures > 0 ? 1 : 0);
+const failed = checks.filter(c => !c.ok);
+console.log(failed.length ? `\n  ${failed.length} FAILED` : `\n  All ${checks.length} checks passed!`);
+process.exit(failed.length ? 1 : 0);

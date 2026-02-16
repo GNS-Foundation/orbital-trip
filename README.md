@@ -1,128 +1,66 @@
-# Orbital TrIP
+# Orbital TrIP — Space Object Identity Registry
 
-**Space Object Identity via Proof-of-Trajectory**
+**Public registry for satellite identity via Proof-of-Trajectory.**
 
-An extension of the [TrIP protocol](https://github.com/GNS-Foundation) to orbital objects. Uses real satellite orbital data (TLE/GP from CelesTrak), SGP4 propagation, and Ed25519 cryptographic signing to demonstrate trajectory-based identity for space traffic management.
-
-## What This Does
-
-- **16 real satellites** tracked with actual TLE orbital elements
-- **SGP4 orbit propagation** generates genuine position data (72-hour window)
-- **Ed25519 breadcrumb chains** — each position is cryptographically signed and hash-linked
-- **Trust scoring** — five-component model (trajectory consistency, operational compliance, chain maturity, observation corroboration, chain integrity)
-- **Anomaly detection** — the Russian Luch/Olymp-K1 spy satellite scores 52.8/100 vs GOES 16 at 95.0/100
-
-## Quick Start
-
-```bash
-# Clone
-git clone https://github.com/GNS-Foundation/orbital-trip.git
-cd orbital-trip
-
-# Install & run
-npm install
-npm start
-
-# Open http://localhost:3000
-```
-
-## API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Health check (used by Railway) |
-| `GET /api/satellites` | Full orbital dataset |
-| `GET /api/satellites/:name` | Single satellite data |
-| `GET /api/trust-leaderboard` | Trust scores ranked |
+Live CelesTrak data → SGP4 propagation → Ed25519 breadcrumb chains → trust scoring for 100+ satellites.
 
 ## Architecture
 
 ```
-orbital-trip/
-├── .github/workflows/
-│   └── deploy.yml          # CI/CD: test → deploy to Railway
-├── public/
-│   ├── index.html          # Interactive mission control dashboard
-│   └── data/
-│       └── orbital_trip_data.json  # SGP4 + Ed25519 signed orbital data
-├── scripts/
-│   ├── healthcheck.js      # Pre-deployment validation
-│   └── orbital_trip_pipeline.py  # Data generation pipeline
-├── src/
-│   └── server.js           # Express API server
-├── Dockerfile              # Production container
-├── railway.json            # Railway deployment config
-└── package.json
+CelesTrak GP API → pipeline.js (Node.js)
+  ├─ satellite.js (SGP4 propagation)
+  ├─ tweetnacl (Ed25519 signatures)
+  ├─ SHA-256 hash chaining
+  └─ Trust scoring engine
+       ↓
+  orbital_trip_data.json → Express API → Dashboard
 ```
 
-## CI/CD Pipeline
+### Live Data Pipeline
 
+The server runs the pipeline on startup and refreshes every 3 hours:
+
+1. Fetches live TLE data from CelesTrak for 100+ curated NORAD IDs
+2. Propagates orbits over 72-hour windows using SGP4
+3. Generates Ed25519 breadcrumb chains for each satellite
+4. Computes trust scores (0–100) with five-tier badges
+5. Serves via REST API and interactive dashboard
+
+### Story Satellites
+
+Five satellites with rich narratives demonstrate why orbital identity matters:
+
+- **LUCH (OLYMP-K1)** — Russia's GEO stalker (12+ repositioning events)
+- **INTELSAT 33E** — Uninsured GEO explosion (insurance case study)
+- **CLUSTER 2 (SALSA)** — ESA's responsible deorbit (ESG compliance)
+- **STARLINK-1007** — Collision avoidance at scale (144K maneuvers)
+- **COSMOS 1408 DEB** — ASAT debris (forensic accountability)
+
+## API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Server + pipeline status |
+| `GET /api/satellites` | Full dataset |
+| `GET /api/satellites/:name` | Single satellite |
+| `GET /api/trust-leaderboard` | Trust score ranking |
+| `GET /api/pipeline/status` | Pipeline run history |
+
+## Development
+
+```bash
+npm install
+npm run dev     # Start with file watching
+npm test        # Run healthcheck
 ```
-Push to main
-    │
-    ▼
-┌──────────────┐     ┌──────────────┐
-│  Test &       │────▶│  Deploy to   │
-│  Validate     │     │  Railway     │
-│              │     │              │
-│ • npm ci     │     │ • railway up │
-│ • data check │     │ • health     │
-│ • server     │     │   verify     │
-│   startup    │     │              │
-└──────────────┘     └──────────────┘
-```
-
-**GitHub Secrets required:**
-- `RAILWAY_TOKEN` — from Railway dashboard → Account Settings → Tokens
-
-**GitHub Variables (optional):**
-- `RAILWAY_URL` — your Railway deployment URL (for post-deploy health check)
 
 ## Deployment
 
-### Railway (recommended)
-
-1. Create project on [railway.app](https://railway.app)
-2. Connect your GitHub repo
-3. Set `RAILWAY_TOKEN` in GitHub Secrets
-4. Push to `main` — CI/CD handles the rest
-
-### Docker
-
-```bash
-docker build -t orbital-trip .
-docker run -p 3000:3000 orbital-trip
-```
-
-## Data Pipeline
-
-The Python pipeline generates orbital data from real TLE elements:
-
-```bash
-pip install sgp4 pynacl requests
-python scripts/orbital_trip_pipeline.py
-```
-
-Currently uses embedded TLE data. To enable live CelesTrak API fetching, uncomment the network calls in the pipeline script and the weekly cron job in `.github/workflows/deploy.yml`.
-
-## Trust Score Components
-
-| Component | Weight | Metric |
-|-----------|--------|--------|
-| Trajectory consistency | 35% | Altitude deviation from predicted orbit |
-| Operational compliance | 25% | Adherence to assigned slot/norms |
-| Chain maturity | 20% | Duration of continuous breadcrumb chain |
-| Observation corroboration | 10% | Independent tracking source count |
-| Chain integrity | 10% | Cryptographic hash chain validity |
-
-## Related
-
-- [GNS Protocol](https://github.com/GNS-Foundation) — Geospatial Naming System
-- [TrIP Specification](https://datatracker.ietf.org/doc/draft-ayerbe-trip-protocol/) — IETF Internet-Draft
-- US Provisional Patent #63/948,788
+Deployed to Railway via GitHub Actions CI/CD. Push to `main` triggers:
+1. Module validation + healthcheck
+2. Server startup test
+3. Railway deployment (on merge)
 
 ## License
 
-AGPL-3.0 — See [LICENSE](LICENSE)
-
-Copyright 2025-2026 ULISSY s.r.l. / GNS Foundation
+AGPL-3.0 — GNS Foundation / ULISSY s.r.l.
