@@ -203,7 +203,14 @@ function init() {
   Object.values(sats).forEach(s => { tiers[s.t.tier] = (tiers[s.t.tier] || 0) + 1; });
 
   document.getElementById("headerStats").innerHTML =
-    `<div class="live-dot"></div> <b>${count}</b> satellites tracked &middot; <b>${stories}</b> stories &middot; Ed25519 &middot; SGP4`;
+    `<div class="live-dot"></div> <b>${count}</b> satellites tracked &middot; <a href="#" id="storyLink" style="color:#0ea5e9;text-decoration:none;border-bottom:1px dashed #0ea5e9"><b>${stories}</b> stories</a> &middot; Ed25519 &middot; SGP4`;
+  document.getElementById("storyLink").onclick = (e) => {
+    e.preventDefault();
+    activeFilter = "STORIES";
+    buildFilters();
+    buildSatList();
+    drawMap();
+  };
 
   // Data source badge
   const gen = DATA.generated ? new Date(DATA.generated) : null;
@@ -235,11 +242,22 @@ function init() {
 // ============================================================
 function buildFilters() {
   const cats = new Map([["ALL", 0]]);
+  let storyCount = 0;
   for (const s of Object.values(DATA.satellites)) {
     cats.set(s.c, (cats.get(s.c) || 0) + 1);
+    if (s.story) storyCount++;
   }
   const container = document.getElementById("filters");
   container.innerHTML = "";
+
+  // Stories filter first
+  const storyBtn = document.createElement("button");
+  storyBtn.textContent = `★ STORIES (${storyCount})`;
+  storyBtn.className = activeFilter === "STORIES" ? "active" : "";
+  storyBtn.style.cssText = activeFilter === "STORIES" ? "" : "color:#0ea5e9;border-color:rgba(14,165,233,.4)";
+  storyBtn.onclick = () => { activeFilter = "STORIES"; buildFilters(); buildSatList(); drawMap(); };
+  container.appendChild(storyBtn);
+
   for (const [cat, count] of cats) {
     const btn = document.createElement("button");
     btn.textContent = cat === "ALL" ? `ALL (${Object.keys(DATA.satellites).length})` : `${cat} (${count})`;
@@ -256,7 +274,8 @@ function getFilteredNames() {
   const sats = DATA.satellites;
   return (DATA.leaderboard || Object.keys(sats)).filter(n => {
     if (!sats[n]) return false;
-    if (activeFilter !== "ALL" && sats[n].c !== activeFilter) return false;
+    if (activeFilter === "STORIES" && !sats[n].story) return false;
+    if (activeFilter !== "ALL" && activeFilter !== "STORIES" && sats[n].c !== activeFilter) return false;
     if (searchQuery) {
       const s = sats[n];
       const haystack = `${n} ${s.o} ${s.c} ${s.n}`.toLowerCase();
