@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orbital TrIP — Space Object Identity Registry</title>
-<meta name="description" content="Open public registry for satellite identity via cryptographic Proof-of-Trajectory. Live CelesTrak data, Ed25519 breadcrumb chains, trust scoring for 100+ satellites.">
+<meta name="description" content="Open public registry for satellite identity via cryptographic Proof-of-Trajectory. Live CelesTrak data, Ed25519 breadcrumb chains, trust scoring for 260+ satellites including 177 insured fleet.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -39,12 +39,14 @@ header .stats b{color:var(--cyan)}
 .sat-item:hover{background:#1e293b}
 .sat-item.selected{background:#1e293b;border-left:3px solid var(--cyan)}
 .sat-item.story{background:rgba(14,165,233,.05)}
+.sat-item.insured-item{background:rgba(34,197,94,.03)}
 .sat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .sat-info{flex:1;min-width:0}
 .sat-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sat-meta{font-size:9px;color:var(--gray)}
 .sat-score{font-size:12px;font-weight:700;flex-shrink:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid}
 .sat-story-badge{font-size:8px;color:var(--cyan);background:rgba(14,165,233,.15);padding:1px 4px;border-radius:2px;margin-left:4px}
+.sat-insured-badge{font-size:8px;color:var(--green);background:rgba(34,197,94,.15);padding:1px 4px;border-radius:2px;margin-left:4px}
 
 /* CENTER - MAP */
 .center{position:relative;overflow:hidden}
@@ -163,7 +165,7 @@ let searchQuery = "";
 
 const TIER_COLORS = {Odysseus:"#22c55e",Voyager:"#0ea5e9",Pathfinder:"#eab308",Explorer:"#f97316",Seedling:"#ef4444"};
 const CAT_COLORS = {
-  Station:"#22c55e","GEO Comms":"#a855f7","GEO Weather":"#06b6d4","Earth Obs":"#3b82f6",
+  Station:"#22c55e","GEO Comms":"#a855f7","MEO Comms":"#8b5cf6","GEO Weather":"#06b6d4","Earth Obs":"#3b82f6",
   Navigation:"#f59e0b",Science:"#ec4899","LEO Constellation":"#0ea5e9",CubeSat:"#6366f1",
   Military:"#64748b",Suspicious:"#ef4444","Catastrophic Failure":"#dc2626",Deorbited:"#94a3b8",Debris:"#ef4444"
 };
@@ -199,14 +201,22 @@ function init() {
   const sats = DATA.satellites;
   const count = Object.keys(sats).length;
   const stories = Object.values(sats).filter(s => s.story).length;
+  const insured = Object.values(sats).filter(s => s.insured).length;
   const tiers = {};
   Object.values(sats).forEach(s => { tiers[s.t.tier] = (tiers[s.t.tier] || 0) + 1; });
 
   document.getElementById("headerStats").innerHTML =
-    `<div class="live-dot"></div> <b>${count}</b> satellites tracked &middot; <a href="#" id="storyLink" style="color:#0ea5e9;text-decoration:none;border-bottom:1px dashed #0ea5e9"><b>${stories}</b> stories</a> &middot; Ed25519 &middot; SGP4`;
+    `<div class="live-dot"></div> <b>${count}</b> satellites tracked &middot; <a href="#" id="insuredLink" style="color:#22c55e;text-decoration:none;border-bottom:1px dashed #22c55e"><b>${insured}</b> insured</a> &middot; <a href="#" id="storyLink" style="color:#0ea5e9;text-decoration:none;border-bottom:1px dashed #0ea5e9"><b>${stories}</b> stories</a> &middot; Ed25519 &middot; SGP4`;
   document.getElementById("storyLink").onclick = (e) => {
     e.preventDefault();
     activeFilter = "STORIES";
+    buildFilters();
+    buildSatList();
+    drawMap();
+  };
+  document.getElementById("insuredLink").onclick = (e) => {
+    e.preventDefault();
+    activeFilter = "INSURED";
     buildFilters();
     buildSatList();
     drawMap();
@@ -243,9 +253,11 @@ function init() {
 function buildFilters() {
   const cats = new Map([["ALL", 0]]);
   let storyCount = 0;
+  let insuredCount = 0;
   for (const s of Object.values(DATA.satellites)) {
     cats.set(s.c, (cats.get(s.c) || 0) + 1);
     if (s.story) storyCount++;
+    if (s.insured) insuredCount++;
   }
   const container = document.getElementById("filters");
   container.innerHTML = "";
@@ -257,6 +269,14 @@ function buildFilters() {
   storyBtn.style.cssText = activeFilter === "STORIES" ? "" : "color:#0ea5e9;border-color:rgba(14,165,233,.4)";
   storyBtn.onclick = () => { activeFilter = "STORIES"; buildFilters(); buildSatList(); drawMap(); };
   container.appendChild(storyBtn);
+
+  // Insured fleet filter
+  const insuredBtn = document.createElement("button");
+  insuredBtn.textContent = `◆ INSURED (${insuredCount})`;
+  insuredBtn.className = activeFilter === "INSURED" ? "active" : "";
+  insuredBtn.style.cssText = activeFilter === "INSURED" ? "background:#22c55e;color:#0a0e17;border-color:#22c55e" : "color:#22c55e;border-color:rgba(34,197,94,.4)";
+  insuredBtn.onclick = () => { activeFilter = "INSURED"; buildFilters(); buildSatList(); drawMap(); };
+  container.appendChild(insuredBtn);
 
   for (const [cat, count] of cats) {
     const btn = document.createElement("button");
@@ -275,7 +295,8 @@ function getFilteredNames() {
   return (DATA.leaderboard || Object.keys(sats)).filter(n => {
     if (!sats[n]) return false;
     if (activeFilter === "STORIES" && !sats[n].story) return false;
-    if (activeFilter !== "ALL" && activeFilter !== "STORIES" && sats[n].c !== activeFilter) return false;
+    if (activeFilter === "INSURED" && !sats[n].insured) return false;
+    if (activeFilter !== "ALL" && activeFilter !== "STORIES" && activeFilter !== "INSURED" && sats[n].c !== activeFilter) return false;
     if (searchQuery) {
       const s = sats[n];
       const haystack = `${n} ${s.o} ${s.c} ${s.n}`.toLowerCase();
@@ -299,7 +320,7 @@ function buildSatList() {
   for (const name of names) {
     const s = sats[name];
     const li = document.createElement("li");
-    li.className = "sat-item" + (name === selectedSat ? " selected" : "") + (s.story ? " story" : "");
+    li.className = "sat-item" + (name === selectedSat ? " selected" : "") + (s.story ? " story" : "") + (s.insured ? " insured-item" : "");
     li.onclick = () => selectSat(name);
 
     const tier = s.t.tier;
@@ -309,7 +330,7 @@ function buildSatList() {
     li.innerHTML = `
       <div class="sat-dot" style="background:${catColor}"></div>
       <div class="sat-info">
-        <div class="sat-name">${name}${s.story ? '<span class="sat-story-badge">STORY</span>' : ''}</div>
+        <div class="sat-name">${name}${s.story ? '<span class="sat-story-badge">STORY</span>' : ''}${s.insured ? '<span class="sat-insured-badge">INSURED</span>' : ''}</div>
         <div class="sat-meta">${s.o} &middot; ${s.p.length > 0 ? Math.round(s.p[0][2]).toLocaleString() + ' km' : 'N/A'}</div>
       </div>
       <div class="sat-score" style="color:${color};border-color:${color}">${s.t.total}</div>
@@ -338,7 +359,7 @@ function renderDetails(name) {
   let html = `
     <div class="section-title">Satellite Identity</div>
     <div class="detail-name">${name}</div>
-    <div class="detail-sub">NORAD ${s.n} &middot; ${s.c} &middot; ${s.o}</div>
+    <div class="detail-sub">NORAD ${s.n} &middot; ${s.c} &middot; ${s.o}${s.insured ? ' &middot; <span style="color:#22c55e;font-weight:600">◆ INSURED</span>' : ''}</div>
 
     <div class="section-title">Orbital TrIP Trust Score</div>
     <div class="trust-big" style="color:${tierColor}">${t.total}<small>/100</small></div>

@@ -199,7 +199,7 @@ function computeTrust(cat, positions) {
 
   // Category-specific divisor (GEO should have near-zero deviation)
   const divisors = {
-    "GEO Comms": 5, "GEO Weather": 5, "Navigation": 200,
+    "GEO Comms": 5, "GEO Weather": 5, "MEO Comms": 100, "Navigation": 200,
     "Suspicious": 2, "Debris": 50, "Catastrophic Failure": 10,
     "Deorbited": 100, "Military": 50,
   };
@@ -208,7 +208,7 @@ function computeTrust(cat, positions) {
 
   // Compliance by category
   const complianceMap = {
-    "GEO Comms": 24, "GEO Weather": 24, "Navigation": 23,
+    "GEO Comms": 24, "GEO Weather": 24, "MEO Comms": 22, "Navigation": 23,
     "Station": 21, "Science": 20, "Earth Obs": 20,
     "LEO Constellation": 18, "CubeSat": 16,
     "Military": 15, "Suspicious": 4, "Debris": 0,
@@ -222,7 +222,7 @@ function computeTrust(cat, positions) {
   // Corroboration
   const corrMap = {
     "Debris": 3, "Suspicious": 7, "Station": 9,
-    "GEO Comms": 8, "GEO Weather": 8, "Navigation": 9,
+    "GEO Comms": 8, "GEO Weather": 8, "MEO Comms": 8, "Navigation": 9,
     "Science": 8, "Military": 6, "Catastrophic Failure": 5,
     "Deorbited": 8, "CubeSat": 6,
   };
@@ -307,6 +307,11 @@ async function runPipeline() {
       record.story = story;
     }
 
+    // Add insured flag if present
+    if (entry.insured) {
+      record.insured = true;
+    }
+
     satellites[entry.name] = record;
     leaderboard.push({ name: entry.name, score: trust.total });
     processed++;
@@ -346,6 +351,7 @@ async function runPipeline() {
   console.log(`  Processed:  ${processed}/${CATALOG.length} satellites`);
   console.log(`  Failed:     ${failed}`);
   console.log(`  Stories:    ${Object.keys(STORIES).length}`);
+  console.log(`  Insured:    ${Object.values(satellites).filter(s => s.insured).length}`);
   console.log(`  Output:     ${sizeKB} KB → ${OUTPUT_PATH}`);
   console.log(`  Top trust:  ${leaderboard[0]?.name || "N/A"} (${leaderboard[0]?.score || 0})`);
   console.log(`  ════════════════════════════════════════════\n`);
