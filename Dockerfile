@@ -13,7 +13,7 @@ RUN apk add --no-cache python3 py3-pip
 
 # Dependencies first (Docker layer caching)
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Application code
 COPY src/ ./src/
