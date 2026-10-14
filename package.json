@@ -1,13 +1,14 @@
 {
   "name": "orbital-trip",
   "version": "1.0.0",
-  "description": "Orbital TrIP — Space Object Identity via Proof-of-Trajectory",
+  "description": "Orbital TrIP \u2014 Space Object Identity via Proof-of-Trajectory",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node scripts/healthcheck.js",
-    "pipeline": "python3 scripts/orbital_trip_pipeline.py"
+    "pipeline": "python3 scripts/orbital_trip_pipeline.py",
+    "test:pipeline": "node scripts/pipeline.test.js"
   },
   "engines": {
     "node": ">=18"

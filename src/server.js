@@ -85,6 +85,8 @@ app.get("/api/trust-leaderboard", (req, res) => {
 app.get("/api/pipeline/status", (req, res) => res.json(pipelineState));
 
 app.get("*", (req, res) => {
+  // Paths with a file extension (scanner probes like /wp-login.php) are not SPA routes
+  if (/\.[a-z0-9]+$/i.test(req.path)) return res.status(404).type("text").send("Not found");
   res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
 

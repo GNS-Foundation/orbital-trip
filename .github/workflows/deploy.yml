@@ -26,6 +26,9 @@ jobs:
       - name: Run healthcheck
         run: npm test
 
+      - name: Pipeline resilience tests
+        run: npm run test:pipeline
+
       - name: Validate catalog
         run: |
           node -e "
